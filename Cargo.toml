@@ -1,0 +1,14 @@
+[package]
+name = "raytracing"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+moddef = "0.2.2"
+array_math = "0.2.10"
+num = "0.4.1"
+
+[dev-dependencies]
+image = "0.24.8"
