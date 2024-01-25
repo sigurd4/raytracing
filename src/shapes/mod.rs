@@ -9,35 +9,33 @@ moddef::moddef!(
     }
 );
 
+use core::ops::Deref;
+
 use num::Float;
 
-use crate::Ray;
+use crate::{Ray, Raytrace};
 
-pub trait Shape<F, const DIMENSIONS: usize>
+pub trait Shape<F, const D: usize>
 where
     F: Float
 {
-    fn raytrace(&self, ray: &Ray<F, DIMENSIONS>) -> F;
-    fn raytrace_norm(&self, ray: &Ray<F, DIMENSIONS>) -> (F, Option<[F; DIMENSIONS]>);
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, D>) -> Raytrace<F, D, N>
+    where
+        [(); N as usize]:;
 }
 
 impl<F, const D: usize, I> Shape<F, D> for I
 where
     F: Float,
-    I: IntoIterator<Item: Shape<F, D>> + Clone
+    for<'a> &'a I: IntoIterator<Item: Deref<Target: Shape<F, D>>>
 {
-    fn raytrace(&self, ray: &Ray<F, D>) -> F
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, D>) -> Raytrace<F, D, N>
+    where
+        [(); N as usize]:
     {
-        self.clone().into_iter()
+        self.into_iter()
             .map(|shape| shape.raytrace(ray))
-            .reduce(Float::min)
-            .unwrap_or(F::infinity())
-    }
-    fn raytrace_norm(&self, ray: &Ray<F, D>) -> (F, Option<[F; D]>)
-    {
-        self.clone().into_iter()
-            .map(|shape| shape.raytrace_norm(ray))
-            .reduce(|a, b| if a.0 < b.0 {a} else {b})
-            .unwrap_or((F::infinity(), None))
+            .reduce(|a, b| if a.t < b.t {a} else {b})
+            .unwrap_or(Raytrace::miss())
     }
 }

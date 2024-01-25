@@ -2,8 +2,9 @@ use core::ops::AddAssign;
 
 use array_math::{ArrayMath, ArrayOps};
 use num::Float;
+use option_trait::MaybeCell;
 
-use crate::{Ray, shapes::Shape};
+use crate::{shapes::Shape, Ray, Raytrace};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Sphere<F>
@@ -31,34 +32,9 @@ impl<F> Shape<F, 3> for Sphere<F>
 where
     F: Float + AddAssign
 {
-    fn raytrace(&self, ray: &Ray<F, 3>) -> F
-    {
-        let r2 = self.r*self.r;
-        let v_abs = ray.v.magnitude();
-        let d = self.r0.sub_each(ray.r);
-        let dsq = d.magnitude_squared();
-        let a = d.mul_dot(ray.v)/v_abs;
-        if a >= F::zero()
-        {
-            let f = r2 - dsq + a*a;
-
-            if f >= F::zero()
-            {
-                return if dsq < r2
-                {
-                    (a + f.sqrt())/v_abs
-                }
-                else
-                {
-                    (a - f.sqrt())/v_abs
-                }
-            }
-        }
-
-        F::infinity()
-    }
-
-    fn raytrace_norm(&self, ray: &Ray<F, 3>) -> (F, Option<[F; 3]>)
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, 3>) -> Raytrace<F, 3, N>
+    where
+        [(); N as usize]:
     {
         let r2 = self.r*self.r;
         let v_abs = ray.v.magnitude();
@@ -79,18 +55,19 @@ where
                 {
                     (a - f.sqrt())/v_abs
                 };
-                return (
+
+                return Raytrace {
                     t,
-                    Some(
+                    n: MaybeCell::from_fn(|| Some(
                         ray.r.add_each(ray.v.mul_all(t))
                             .sub_each(self.r0)
                             .normalize()
-                    )
-                )
+                    ))
+                }
             }
         }
 
-        (F::infinity(), None)
+        Raytrace::miss()
     }
 }
 

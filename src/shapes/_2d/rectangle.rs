@@ -2,8 +2,9 @@ use core::{f64::EPSILON, ops::{AddAssign, Range}};
 
 use array_math::{ArrayMath, ArrayOps};
 use num::Float;
+use option_trait::MaybeCell;
 
-use crate::{Ray, shapes::Shape};
+use crate::{shapes::Shape, Ray, Raytrace};
 
 #[derive(Debug, Clone)]
 pub struct Rectangle<F>
@@ -25,11 +26,13 @@ where
     }
 }
 
-impl<F> Shape<F, 3> for Rectangle<F>
+impl<F> Shape<F, 2> for Rectangle<F>
 where
     F: Float + AddAssign
 {
-    fn raytrace(&self, ray: &Ray<F, 3>) -> F
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, 2>) -> Raytrace<F, 2, N>
+    where
+        [(); N as usize]:
     {
         let eps = F::epsilon();
 
@@ -41,6 +44,7 @@ where
             .all(|(r, c)| r >= c.start && r <= c.end));
 
         let mut t_min = F::infinity();
+        let mut n_min = MaybeCell::from_fn(|| None);
 
         for k in 0..2
         {
@@ -53,6 +57,11 @@ where
                     x[n] >= self.c[n].start - eps && x[n] <= self.c[n].end + eps
                 })
                 {
+                    n_min = MaybeCell::from_fn(|| {
+                        let mut n = [F::zero(); 2];
+                        n[k] = if inside {F::one()} else {-F::one()};
+                        Some(n)
+                    });
                     t_min = t;
                 }
                 
@@ -63,61 +72,20 @@ where
                     x[n] >= self.c[n].start - eps && x[n] <= self.c[n].end + eps
                 })
                 {
+                    n_min = MaybeCell::from_fn(|| {
+                        let mut n = [F::zero(); 2];
+                        n[k] = if inside {-F::one()} else {F::one()};
+                        Some(n)
+                    });
                     t_min = t;
                 }
             }
         }
         
-        t_min
-    }
-
-    fn raytrace_norm(&self, ray: &Ray<F, 3>) -> (F, Option<[F; 3]>)
-    {
-        let eps = F::epsilon();
-
-        let c1 = self.c.each_ref().map(|c| c.start);
-        let c2 = self.c.each_ref().map(|c| c.end);
-
-        let inside = ray.r.into_iter()
-            .zip(self.c.iter())
-            .all(|(r, c)| r >= c.start && r <= c.end);
-
-        let mut t_min = F::infinity();
-        let mut n_min = None;
-
-        for k in 0..2
-        {
-            if ray.v[k] != F::zero()
-            {
-                let t = (c1[k] - ray.r[k])/ray.v[k];
-                if t >= F::zero() && t < t_min && (inside || {
-                    let x = ray.propagate(t);
-                    let n = (k + 1) % 2;
-                    x[n] >= self.c[n].start - eps && x[n] <= self.c[n].end + eps
-                })
-                {
-                    let mut n = [F::zero(); 3];
-                    n[k] = if inside {F::one()} else {-F::one()};
-                    n_min = Some(n);
-                    t_min = t;
-                }
-                
-                let t = (c2[k] - ray.r[k])/ray.v[k];
-                if t >= F::zero() && t < t_min && (inside || {
-                    let x = ray.propagate(t);
-                    let n = (k + 1) % 2;
-                    x[n] >= self.c[n].start - eps && x[n] <= self.c[n].end + eps
-                })
-                {
-                    let mut n = [F::zero(); 3];
-                    n[k] = if inside {-F::one()} else {F::one()};
-                    n_min = Some(n);
-                    t_min = t;
-                }
-            }
+        Raytrace {
+            t: t_min,
+            n: n_min
         }
-        
-        (t_min, n_min)
     }
 }
 

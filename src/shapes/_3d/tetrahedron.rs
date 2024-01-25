@@ -2,8 +2,9 @@ use core::{f64::EPSILON, ops::{AddAssign, MulAssign, Range}};
 
 use array_math::{ArrayMath, ArrayOps};
 use num::Float;
+use option_trait::MaybeCell;
 
-use crate::{Ray, shapes::{nd::Plane, Shape}};
+use crate::{shapes::{nd::Plane, Shape}, Ray, Raytrace};
 
 #[derive(Debug, Clone)]
 pub struct Tetrahedron<F>
@@ -11,18 +12,18 @@ where
     F: Float
 {
     pub center: [F; 3],
-    pub diameter: F
+    pub diameters: [F; 4]
 }
 
 impl<F> Tetrahedron<F>
 where
     F: Float
 {
-    pub fn new(center: [F; 3], diameter: F) -> Self
+    pub fn new(center: [F; 3], diameters: [F; 4]) -> Self
     {
         Self {
             center,
-            diameter
+            diameters
         }
     }
 }
@@ -31,46 +32,18 @@ impl<F> Shape<F, 3> for Tetrahedron<F>
 where
     F: Float + AddAssign + MulAssign
 {
-    fn raytrace(&self, ray: &Ray<F, 3>) -> F
-    {
-        let eps = F::epsilon();
-
-        const V: [[f64; 3]; 4] = [
-            [0.47140452079103168293389624140323, 0.0, -1.0/3.0],
-            [-0.47140452079103168293389624140323, 0.81649658092772603273242802490196, -1.0/3.0],
-            [-0.47140452079103168293389624140323, -0.81649658092772603273242802490196, -1.0/3.0],
-            [0.0, 0.0, 1.0]
-        ];
-
-        let radius = self.diameter*F::from(0.5).unwrap();
-
-        let s: [_; V.len()] = ArrayOps::fill(|i| Plane::new_from_vertices(ArrayOps::fill(|k| 
-            V[(i + k) % V.len()].map(|x| F::from(x).unwrap()*radius)
-        )));
-
-        let t = s.into_iter().raytrace(ray);
-
-        let x = ray.propagate(t);
-
-        if x.sub_each(self.center).magnitude_squared() > radius*radius + eps
-        {
-            return F::infinity()
-        }
-
-        t
-    }
-
-    fn raytrace_norm(&self, ray: &Ray<F, 3>) -> (F, Option<[F; 3]>)
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, 3>) -> Raytrace<F, 3, N>
+    where
+        [(); N as usize]:
     {
         const V: [[f64; 3]; 4] = [
-            [0.47140452079103168293389624140323, 0.0, -1.0/3.0],
-            [-0.47140452079103168293389624140323, 0.81649658092772603273242802490196, -1.0/3.0],
-            [-0.47140452079103168293389624140323, -0.81649658092772603273242802490196, -1.0/3.0],
-            [0.0, 0.0, 1.0]
+            [0.94280904158206336586779248280647, -1.0/3.0, 0.0],
+            [-0.47140452079103168293389624140323, -1.0/3.0, 0.81649658092772603273242802490196],
+            [-0.47140452079103168293389624140323, -1.0/3.0, -0.81649658092772603273242802490196],
+            [0.0, 1.0, 0.0]
         ];
 
-        let radius = self.diameter*F::from(0.5).unwrap();
-        let v = V.map(|v| v.map(|v| F::from(v).unwrap()*radius));
+        let v = V.comap(self.diameters, |v, d| v.map(|v| F::from(v).unwrap()*d*F::from(0.5).unwrap()));
 
         let sv = [
             [v[0], v[1], v[2]],
@@ -86,11 +59,9 @@ where
         for k in 0..4
         {
             let v1 = v[(k + 1) % 4];
-            let v2 = v[(k + 2) % 4];
-            let v3 = v[(k + 3) % 4];
             let v4 = v[(k) % 4];
 
-            let n = v2.sub_each(v1).mul_cross([&v3.sub_each(v1)]);
+            let n = s[(k + 1) % 4].n;
             let dv4 = n.mul_dot(v4.sub_each(v1));
             let dx = n.mul_dot(ray.r.sub_each(v1));
 
@@ -102,15 +73,15 @@ where
         }
 
         let mut t_min = F::infinity();
-        let mut n_min = None;
+        let mut n_min = MaybeCell::from_fn(|| None);
 
         'lp:
-        for (i, s) in s.into_iter()
+        for (i, si) in s.into_iter()
             .enumerate()
         {
             let t = {
-                let vn = ray.v.mul_dot(s.n);
-                s.r.sub_each(ray.r).mul_dot(s.n)/vn
+                let vn = ray.v.mul_dot(si.n);
+                si.r.sub_each(ray.r).mul_dot(si.n)/vn
             };
 
             if t < F::zero() || t >= t_min
@@ -122,11 +93,9 @@ where
             for k in 0..3
             {
                 let v1 = v[(i + k + 1) % 4];
-                let v2 = v[(i + k + 2) % 4];
-                let v3 = v[(i + k + 3) % 4];
                 let v4 = v[(i + k) % 4];
 
-                let n = v2.sub_each(v1).mul_cross([&v3.sub_each(v1)]);
+                let n = s[(i + k + 1) % 4].n;
                 let dv4 = n.mul_dot(v4.sub_each(v1));
                 let dx = n.mul_dot(x.sub_each(v1));
 
@@ -137,10 +106,13 @@ where
             }
 
             t_min = t;
-            n_min = Some(s.n.normalize_to(if inside {F::one()} else {-F::one()}));
+            n_min = MaybeCell::from_fn(|| Some(si.n.normalize_to(if inside {F::one()} else {-F::one()})));
         }
 
-        (t_min, n_min)
+        Raytrace {
+            t: t_min,
+            n: n_min
+        }
     }
 }
 
@@ -156,7 +128,7 @@ mod test
     #[test]
     fn test()
     {
-        let shape = Transform::new(Tetrahedron::new([0.0, 0.0, 0.0], 2.0))
+        let shape = Transform::new(Tetrahedron::new([0.0, 0.0, 0.0], [2.0, 2.0, 2.0, 2.0]))
             .rotate([1.0, 0.0, 0.0], -FRAC_PI_4)
             .rotate([0.0, 1.0, 0.0], FRAC_PI_4);
 

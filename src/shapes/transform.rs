@@ -1,9 +1,9 @@
 use core::ops::{AddAssign, DivAssign, SubAssign};
 
-use array_math::{max_len, Array2dOps, ArrayMath, ArrayOps, MatrixMath, SquareMatrixMath};
+use array_math::{max_len, Array2dOps, ArrayMath, ArrayOps, CollumnArrayOps, MatrixMath, SquareMatrixMath};
 use num::{Float, Signed};
 
-use crate::Ray;
+use crate::{Ray, Raytrace};
 
 use super::Shape;
 
@@ -38,8 +38,8 @@ where
         F: AddAssign,
         [(); D + 1 - D]:
     {
-        self.t.mul_matrix(&r.map(|r| [r]))
-            .map(|[r]| r)
+        self.t.mul_matrix(r.as_collumn())
+            .into_uncollumn()
     }
 
     pub fn inv_transform_pos(&self, r: [F; D]) -> [F; D]
@@ -47,8 +47,8 @@ where
         F: AddAssign,
         [(); D + 1 - D]:
     {
-        self.t_inv.mul_matrix(&r.map(|r| [r]))
-            .map(|[r]| r)
+        self.t_inv.mul_matrix(r.as_collumn())
+            .into_uncollumn()
     }
 
 
@@ -56,8 +56,8 @@ where
     where
         F: AddAssign + Signed + SubAssign + DivAssign,
     {
-        self.t = t.mul_matrix(&self.t);
-        self.t_inv = t_inv.mul_matrix(&self.t_inv);
+        self.t.rmul_matrix_assign(&t);
+        self.t_inv.rmul_matrix_assign(&t_inv);
         self
     }
 
@@ -155,26 +155,25 @@ where
     [(); D + 1]:,
     [(); D + 1 - D]:
 {
-    fn raytrace(&self, ray: &Ray<F, D>) -> F
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, D>) -> Raytrace<F, D, N>
+    where
+        [(); N as usize]:
     {
         let ray = Ray::new_from_to(self.inv_transform_pos(ray.r), self.inv_transform_pos(ray.r.add_each(ray.v)));
-        self.s.raytrace(&ray)
-    }
-    fn raytrace_norm(&self, ray: &Ray<F, D>) -> (F, Option<[F; D]>)
-    {
-        let ray = Ray::new_from_to(self.inv_transform_pos(ray.r), self.inv_transform_pos(ray.r.add_each(ray.v)));
-        let (t, n) = self.s.raytrace_norm(&ray);
-        let n = if let Some(n) = n
-        {
-            let n0 = ray.propagate(t);
-            let n1 = n0.add_each(n);
-
-            Some(self.transform_pos(n1).sub_each(self.transform_pos(n0)))
+        let raytrace = self.s.raytrace(&ray);
+        Raytrace {
+            t: raytrace.t,
+            n: raytrace.n.map(|n| if let Some(n) = n
+            {
+                let n0 = ray.propagate(raytrace.t);
+                let n1 = n0.add_each(n);
+    
+                Some(self.transform_pos(n1).sub_each(self.transform_pos(n0)))
+            }
+            else
+            {
+                None
+            })
         }
-        else
-        {
-            None
-        };
-        (t, n)
     }
 }

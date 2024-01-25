@@ -6,6 +6,7 @@
 #![feature(associated_type_bounds)]
 
 #![feature(generic_const_exprs)]
+#![feature(adt_const_params)]
 
 use array_math::ArrayOps;
 use num::Float;
@@ -13,40 +14,12 @@ use num::Float;
 moddef::moddef!(
     pub mod {
         shapes
+    },
+    flat(pub) mod {
+        ray,
+        raytrace
     }
 );
-
-#[derive(Debug, Clone, Copy)]
-pub struct Ray<F, const D: usize>
-where
-    F: Float
-{
-    pub r: [F; D],
-    pub v: [F; D]
-}
-
-impl<F, const D: usize> Ray<F, D>
-where
-    F: Float
-{
-    pub const fn new(r: [F; D], v: [F; D]) -> Self
-    {
-        Self {
-            r,
-            v
-        }
-    }
-
-    pub fn new_from_to(r_from: [F; D], r_to: [F; D]) -> Self
-    {
-        Self::new(r_from, r_to.sub_each(r_from))
-    }
-
-    pub fn propagate(&self, t: F) -> [F; D]
-    {
-        self.r.add_each(self.v.mul_all(t))
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -88,7 +61,7 @@ mod tests {
         let t: Box<[Box<[_; N]>; N]> = ArrayOps::fill_boxed(|y| ArrayOps::fill_boxed(|x| {
 
             let x = x as f64/(N - 1) as f64*2.0 - 1.0;
-            let y = y as f64/(N - 1) as f64*2.0 - 1.0;
+            let y = 1.0 - y as f64/(N - 1) as f64*2.0;
 
             let ray = Ray::new(
                 [
@@ -103,19 +76,17 @@ mod tests {
                 ].normalize()
             );
 
-            shape.raytrace_norm(&ray)
+            shape.raytrace::<true>(&ray)
         }));
 
         let t_min = t.iter()
-            .flat_map(|t| t.iter().map(|(t, _)| t))
-            .filter(|&t| t.is_finite())
-            .map(|&t| t)
+            .flat_map(|t| t.iter().map(|raytrace| raytrace.t))
+            .filter(|t| t.is_finite())
             .reduce(f64::min)
             .unwrap_or(0.0);
         let t_max = t.iter()
-            .flat_map(|t| t.iter().map(|(t, _)| t))
-            .filter(|&t| t.is_finite())
-            .map(|&t| t)
+            .flat_map(|t| t.iter().map(|raytrace| raytrace.t))
+            .filter(|t| t.is_finite())
             .reduce(f64::max)
             .unwrap_or(1.0);
 
@@ -125,12 +96,13 @@ mod tests {
         const DIR_GREEN: [f64; 3] = [-FRAC_1_SQRT_3, -FRAC_1_SQRT_3, FRAC_1_SQRT_3];
         const DIR_BLUE: [f64; 3] = [FRAC_1_SQRT_2, -FRAC_1_SQRT_2, 0.0];
 
-        image::RgbImage::from_fn(N as u32, N as u32, |x, y| {
-            let (t, n) = t[y as usize][x as usize];
-            if t.is_finite() && let Some(n) = n
+        const BRIGHTNESS: f64 = 100.0;
+
+        image::RgbImage::from_fn(N as u32, N as u32, move |x, y| {
+            let raytrace = t[y as usize][x as usize];
+            if raytrace.t.is_finite() && let Some(n) = raytrace.n.into_value()
             {
-                let t_norm = (t - t_min)/(t_max - t_min);
-                let l = 1.0 - t_norm*0.1;
+                let l = (-raytrace.t/BRIGHTNESS).exp();
 
                 let r = l*(DIR_RED.mul_dot(n)*0.5 + 0.5);
                 let g = l*(DIR_GREEN.mul_dot(n)*0.5 + 0.5);

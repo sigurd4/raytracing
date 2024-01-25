@@ -2,8 +2,9 @@ use core::ops::{AddAssign, MulAssign};
 
 use array_math::{ArrayMath, ArrayOps};
 use num::{traits::real::Real, Float};
+use option_trait::MaybeCell;
 
-use crate::{Ray, shapes::Shape};
+use crate::{shapes::Shape, Ray, Raytrace};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Plane<F, const D: usize>
@@ -45,25 +46,20 @@ impl<F, const D: usize> Shape<F, D> for Plane<F, D>
 where
     F: Float + AddAssign
 {
-    fn raytrace(&self, ray: &Ray<F, D>) -> F
-    {
-        let t = self.r.sub_each(ray.r).mul_dot(self.n)/ray.v.mul_dot(self.n);
-        if t >= F::zero()
-        {
-            return t;
-        }
-        F::infinity()
-    }
-
-    fn raytrace_norm(&self, ray: &Ray<F, D>) -> (F, Option<[F; D]>)
+    fn raytrace<const N: bool>(&self, ray: &Ray<F, D>) -> Raytrace<F, D, N>
+    where
+        [(); N as usize]:
     {
         let vn = ray.v.mul_dot(self.n);
         let t = self.r.sub_each(ray.r).mul_dot(self.n)/vn;
         if t >= F::zero()
         {
-            return (t, Some(self.n.normalize_to(vn.signum())));
+            return Raytrace {
+                t,
+                n: MaybeCell::from_fn(|| Some(self.n.normalize_to(vn.signum())))
+            };
         }
-        (F::infinity(), None)
+        Raytrace::miss()
     }
 }
 

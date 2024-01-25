@@ -3,6 +3,7 @@ moddef::moddef!(
         cube,
         rectangular_prism,
         sphere,
-        tetrahedron
+        tetrahedron,
+        triangular_plane
     }
 );
