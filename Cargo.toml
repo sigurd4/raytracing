@@ -16,4 +16,3 @@ option_trait = "0.1.5"
 
 [dev-dependencies]
 image = "0.24.8"
-show-image = "0.13.1"
