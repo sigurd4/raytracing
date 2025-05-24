@@ -6,6 +6,8 @@
 #![feature(slice_as_array)]
 #![feature(specialization)]
 
+#![allow(clippy::excessive_precision)]
+
 moddef::moddef!(
     pub mod {
         shapes,
@@ -20,7 +22,8 @@ moddef::moddef!(
 );
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use core::f64::consts::{FRAC_1_SQRT_2, FRAC_1_SQRT_3, TAU};
     use std::time::SystemTime;
 
@@ -34,7 +37,7 @@ mod tests {
     where
         S: Shape<f64, 3> + Clone
     {
-        const SPIN_SPEED: f64 = TAU*0.02;
+        const SPIN_SPEED: f64 = TAU * 0.02;
 
         let t0 = SystemTime::now();
         loop
@@ -42,8 +45,7 @@ mod tests {
             let t = SystemTime::now();
             let dt = t.duration_since(t0).unwrap().as_secs_f64();
 
-            let shape = Transform::new(shape.clone())
-                .rotate([0.0, 1.0, 0.0], SPIN_SPEED*dt);
+            let shape = Transform::new(shape.clone()).rotate([0.0, 1.0, 0.0], SPIN_SPEED * dt);
 
             project_3d_once(&shape, lens_pos, lens_size, lens_bend);
         }
@@ -57,25 +59,21 @@ mod tests {
 
         let [lens_x, lens_y, lens_z] = lens_pos;
 
-        let t: Box<[[_; N]; N]> = (0..N).map(|y| core::array::from_fn(|x| {
-                let x = x as f64/(N - 1) as f64*2.0 - 1.0;
-                let y = 1.0 - y as f64/(N - 1) as f64*2.0;
+        let t: Box<[[_; N]; N]> = (0..N)
+            .map(|y| {
+                core::array::from_fn(|x| {
+                    let x = x as f64 / (N - 1) as f64 * 2.0 - 1.0;
+                    let y = 1.0 - y as f64 / (N - 1) as f64 * 2.0;
 
-                let ray = Ray {
-                    r: [
-                        x*lens_size + lens_x,
-                        y*lens_size + lens_y,
-                        lens_z
-                    ],
-                    v: vec3::normalize([
-                        x*lens_bend,
-                        y*lens_bend,
-                        1.0
-                    ])
-                };
+                    let ray = Ray {
+                        r: [x * lens_size + lens_x, y * lens_size + lens_y, lens_z],
+                        v: vec3::normalize([x * lens_bend, y * lens_bend, 1.0])
+                    };
 
-                shape.raytrace_with_norm(&ray)
-            })).collect::<Vec<_>>()
+                    shape.raytrace_with_norm(&ray)
+                })
+            })
+            .collect::<Vec<_>>()
             .into_boxed_slice()
             .into_array::<N>()
             .unwrap();
@@ -101,26 +99,26 @@ mod tests {
 
         image::RgbImage::from_fn(N as u32, N as u32, move |x, y| {
             let raytrace = t[y as usize][x as usize];
-            if raytrace.t.is_finite() && let Some(n) = raytrace.n
+            if raytrace.t.is_finite()
+                && let Some(n) = raytrace.n
             {
-                let l = (-raytrace.t/BRIGHTNESS).exp();
+                let l = (-raytrace.t / BRIGHTNESS).exp();
 
-                let r = l*(vec3::mul_dot(DIR_RED, n)*0.5 + 0.5);
-                let g = l*(vec3::mul_dot(DIR_GREEN, n)*0.5 + 0.5);
-                let b = l*(vec3::mul_dot(DIR_BLUE, n)*0.5 + 0.5);
-                
-                Rgb([(r*255.0) as u8, (g*255.0) as u8, (b*255.0) as u8])
+                let r = l * (vec3::mul_dot(DIR_RED, n) * 0.5 + 0.5);
+                let g = l * (vec3::mul_dot(DIR_GREEN, n) * 0.5 + 0.5);
+                let b = l * (vec3::mul_dot(DIR_BLUE, n) * 0.5 + 0.5);
+
+                Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
             }
             else
             {
                 BACKGROUND
             }
-        }).save("output.png").unwrap();
+        })
+        .save("output.png")
+        .unwrap();
     }
 
     #[test]
-    fn it_works()
-    {
-
-    }
+    fn it_works() {}
 }

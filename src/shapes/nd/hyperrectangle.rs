@@ -19,10 +19,10 @@ where
     {
         let eps = F::epsilon();
 
-        let inside = false && (ray.r.into_iter()
+        let inside = false /*&& (ray.r.into_iter()
             .zip(self.c1)
             .zip(self.c2)
-            .all(|((r, c1), c2)| r >= c1 && r <= c2));
+            .all(|((r, c1), c2)| r >= c1 && r <= c2))*/;
 
         let mut t_min = F::infinity();
         let mut n_min = n_init;
