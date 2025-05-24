@@ -4,7 +4,7 @@ use array_math::{ArrayMath, ArrayOps};
 use num::Float;
 use option_trait::MaybeCell;
 
-use crate::{shapes::{nd::Plane, Shape}, Ray, Raytrace};
+use crate::{shapes::{nd::HyperPlane, Shape}, Ray, Raytrace};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TriangularPlane<F>
@@ -14,27 +14,15 @@ where
     vertices: [[F; 3]; 3]
 }
 
-impl<F> TriangularPlane<F>
-where
-    F: Float
-{
-    pub fn new(vertices: [[F; 3]; 3]) -> Self
-    {
-        Self {
-            vertices
-        }
-    }
-}
-
 impl<F> Shape<F, 3> for TriangularPlane<F>
 where
     F: Float + AddAssign + MulAssign
 {
-    fn raytrace<const N: bool>(&self, ray: &Ray<F, 3>) -> Raytrace<F, 3, N>
+    fn raytrace(&self, ray: &Ray<F, 3>) -> Raytrace<F, 3, N>
     where
         [(); N as usize]:
     {
-        let s = Plane::new_from_vertices(self.vertices);
+        let s = HyperPlane::new_from_vertices(self.vertices);
 
         let vn = ray.v.mul_dot(s.n);
         let t = s.r.sub_each(ray.r).mul_dot(s.n)/vn;

@@ -1,19 +1,21 @@
 #![cfg_attr(not(test), no_std)]
-#![feature(array_methods)]
 #![feature(generic_arg_infer)]
 #![feature(more_float_constants)]
 #![feature(let_chains)]
-#![feature(associated_type_bounds)]
-
-#![feature(generic_const_exprs)]
+#![feature(const_trait_impl)]
+#![feature(iter_next_chunk)]
 #![feature(adt_const_params)]
-
-use array_math::ArrayOps;
-use num::Float;
+#![feature(const_ops)]
+#![feature(slice_as_array)]
+#![feature(specialization)]
+#![feature(generic_const_exprs)]
 
 moddef::moddef!(
     pub mod {
-        shapes
+        shapes,
+        matrix,
+        vec2,
+        vec3
     },
     flat(pub) mod {
         ray,
@@ -23,10 +25,9 @@ moddef::moddef!(
 
 #[cfg(test)]
 mod tests {
-    use core::f64::consts::{FRAC_1_SQRT_2, FRAC_1_SQRT_3, SQRT_2, SQRT_3, TAU};
+    use core::f64::consts::{FRAC_1_SQRT_2, FRAC_1_SQRT_3, TAU};
     use std::time::SystemTime;
 
-    use array_math::ArrayMath;
     use image::Rgb;
 
     use self::shapes::{Shape, Transform};
@@ -58,28 +59,32 @@ mod tests {
     {
         const N: usize = 256;
 
-        let t: Box<[Box<[_; N]>; N]> = ArrayOps::fill_boxed(|y| ArrayOps::fill_boxed(|x| {
+        let [lens_x, lens_y, lens_z] = lens_pos;
 
-            let x = x as f64/(N - 1) as f64*2.0 - 1.0;
-            let y = 1.0 - y as f64/(N - 1) as f64*2.0;
+        let t: Box<[[_; N]; N]> = (0..N).map(|y| core::array::from_fn(|x| {
+                let x = x as f64/(N - 1) as f64*2.0 - 1.0;
+                let y = 1.0 - y as f64/(N - 1) as f64*2.0;
 
-            let ray = Ray::new(
-                [
-                    x*lens_size,
-                    y*lens_size,
-                    0.0
-                ].add_each(lens_pos),
-                [
-                    x*lens_bend,
-                    y*lens_bend,
-                    1.0
-                ].normalize()
-            );
+                let ray = Ray {
+                    r: [
+                        x*lens_size + lens_x,
+                        y*lens_size + lens_y,
+                        lens_z
+                    ],
+                    v: vec3::normalize([
+                        x*lens_bend,
+                        y*lens_bend,
+                        1.0
+                    ])
+                };
 
-            shape.raytrace::<true>(&ray)
-        }));
+                shape.raytrace_with_norm(&ray)
+            })).collect::<Vec<_>>()
+            .into_boxed_slice()
+            .into_array::<N>()
+            .unwrap();
 
-        let t_min = t.iter()
+        /*let t_min = t.iter()
             .flat_map(|t| t.iter().map(|raytrace| raytrace.t))
             .filter(|t| t.is_finite())
             .reduce(f64::min)
@@ -88,7 +93,7 @@ mod tests {
             .flat_map(|t| t.iter().map(|raytrace| raytrace.t))
             .filter(|t| t.is_finite())
             .reduce(f64::max)
-            .unwrap_or(1.0);
+            .unwrap_or(1.0);*/
 
         const BACKGROUND: Rgb<u8> = Rgb([255, 255, 255]);
 
@@ -100,13 +105,13 @@ mod tests {
 
         image::RgbImage::from_fn(N as u32, N as u32, move |x, y| {
             let raytrace = t[y as usize][x as usize];
-            if raytrace.t.is_finite() && let Some(n) = raytrace.n.into_value()
+            if raytrace.t.is_finite() && let Some(n) = raytrace.n
             {
                 let l = (-raytrace.t/BRIGHTNESS).exp();
 
-                let r = l*(DIR_RED.mul_dot(n)*0.5 + 0.5);
-                let g = l*(DIR_GREEN.mul_dot(n)*0.5 + 0.5);
-                let b = l*(DIR_BLUE.mul_dot(n)*0.5 + 0.5);
+                let r = l*(vec3::mul_dot(DIR_RED, n)*0.5 + 0.5);
+                let g = l*(vec3::mul_dot(DIR_GREEN, n)*0.5 + 0.5);
+                let b = l*(vec3::mul_dot(DIR_BLUE, n)*0.5 + 0.5);
                 
                 Rgb([(r*255.0) as u8, (g*255.0) as u8, (b*255.0) as u8])
             }

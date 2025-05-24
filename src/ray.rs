@@ -1,4 +1,3 @@
-use array_math::ArrayOps;
 use num::Float;
 
 #[derive(Debug, Clone, Copy)]
@@ -14,21 +13,39 @@ impl<F, const D: usize> Ray<F, D>
 where
     F: Float
 {
-    pub const fn new(r: [F; D], v: [F; D]) -> Self
-    {
-        Self {
-            r,
-            v
-        }
-    }
-
     pub fn new_from_to(r_from: [F; D], r_to: [F; D]) -> Self
     {
-        Self::new(r_from, r_to.sub_each(r_from))
+        Self {
+            r: r_from,
+            v: unsafe {
+                r_to.into_iter()
+                    .zip(r_from)
+                    .map(|(r_to, r_from)| r_to - r_from)
+                    .next_chunk()
+                    .unwrap_unchecked()
+            }
+        }
     }
 
     pub fn propagate(&self, t: F) -> [F; D]
     {
-        self.r.add_each(self.v.mul_all(t))
+        unsafe {
+            self.r.into_iter()
+                .zip(self.v)
+                .map(|(r, v)| r + v*t)
+                .next_chunk()
+                .unwrap_unchecked()
+        }
+    }
+
+    pub fn r_to(&self) -> [F; D]
+    {
+        unsafe {
+            self.r.into_iter()
+                .zip(self.v)
+                .map(|(r, v)| r + v)
+                .next_chunk()
+                .unwrap_unchecked()
+        }
     }
 }

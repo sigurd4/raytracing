@@ -1,9 +1,8 @@
-use core::ops::{AddAssign, DivAssign, SubAssign};
+use core::{iter::Sum, ops::{AddAssign, DivAssign, SubAssign}};
 
-use array_math::{max_len, Array2dOps, ArrayMath, ArrayOps, CollumnArrayOps, MatrixMath, SquareMatrixMath};
 use num::{Float, Signed};
 
-use crate::{Ray, Raytrace};
+use crate::{matrix, vec3, Ray, Raytrace, RaytraceWithNorm};
 
 use super::Shape;
 
@@ -21,52 +20,41 @@ where
 impl<F, S, const D: usize> Transform<F, S, D>
 where
     S: Shape<F, D>,
-    F: Float,
-    [(); D + 1]:
+    F: Float
 {
     pub fn new(s: S) -> Self
     {
         Self {
             s,
-            t: MatrixMath::identity_matrix(),
-            t_inv: MatrixMath::identity_matrix()
+            t: matrix::identity(),
+            t_inv: matrix::identity()
         }
     }
 
     pub fn transform_pos(&self, r: [F; D]) -> [F; D]
     where
-        F: AddAssign,
-        [(); D + 1 - D]:
+        F: Sum
     {
-        self.t.mul_matrix(r.as_collumn())
-            .into_uncollumn()
+        matrix::mul_matrix_collumn(self.t, r)
     }
 
     pub fn inv_transform_pos(&self, r: [F; D]) -> [F; D]
     where
-        F: AddAssign,
-        [(); D + 1 - D]:
+        F: Sum
     {
-        self.t_inv.mul_matrix(r.as_collumn())
-            .into_uncollumn()
+        matrix::mul_matrix_collumn(self.t_inv, r)
     }
 
-
-    pub fn transform(mut self, (t, t_inv): ([[F; D]; D], [[F; D]; D])) -> Self
-    where
-        F: AddAssign + Signed + SubAssign + DivAssign,
+    pub fn transform(mut self, t: [[F; D]; D], t_inv: [[F; D]; D]) -> Self
     {
-        self.t.rmul_matrix_assign(&t);
-        self.t_inv.rmul_matrix_assign(&t_inv);
+        self.t = matrix::mul_matrix_matrix(t, &self.t);
+        self.t_inv = matrix::mul_matrix_matrix(t_inv, &self.t_inv);
         self
     }
 
     pub fn scale(self, scale: [F; D]) -> Self
-    where
-        F: AddAssign + Default + Signed + SubAssign + DivAssign,
-        [(); D - D]:,
     {
-        self.transform((scale.diagonal(), scale.map(|scale| scale.recip()).diagonal()))
+        self.transform(matrix::diagonal(scale), matrix::diagonal(scale.map(|scale| scale.recip())))
     }
 }
 
@@ -76,22 +64,20 @@ where
     F: Float
 {
     pub fn rotate(self, theta: F) -> Self
-    where
-        F: AddAssign + Signed + SubAssign + DivAssign
     {
         let c = theta.cos();
         let s = theta.sin();
 
-        self.transform((
+        self.transform(
             [
                 [c, -s],
-                [s, c ],
+                [s, c],
             ],
             [
                 [c,  s],
                 [-s, c]
             ]
-        ))
+        )
     }
 }
 
@@ -101,8 +87,6 @@ where
     F: Float
 {
     pub fn rotate(self, axis: [F; 3], theta: F) -> Self
-    where
-        F: AddAssign + Signed + SubAssign + DivAssign
     {
         let [x, y, z] = axis;
 
@@ -110,7 +94,7 @@ where
         let s = theta.sin();
         let c1m = F::one() - c;
 
-        self.transform((
+        self.transform(
             [
                 [x*x*c1m + c,   y*x*c1m - z*s, z*x*c1m + y*s],
                 [x*y*c1m + z*s, y*y*c1m + c,   z*y*c1m - x*s],
@@ -121,59 +105,64 @@ where
                 [x*y*c1m - z*s, y*y*c1m + c,   z*y*c1m + x*s],
                 [x*z*c1m + y*s, y*z*c1m - x*s, z*z*c1m + c  ],
             ]
-        ))
+        )
     }
 
     pub fn mirror(self, n: [F; 3]) -> Self
-    where
-        F: AddAssign + Signed + SubAssign + DivAssign
     {
-        let [a, b, c] = n.normalize();
+        let [a, b, c] = vec3::normalize(n);
 
-        let _1 = F::one();
-        let _2 = F::from(2.0).unwrap();
+        let one = F::one();
+        let two = F::from(2.0).unwrap();
 
-        self.transform((
-            [
-                [_1 - _2*a*a, -_2*a*b,     -_2*a*c],
-                [-_2*a*b,     _1 - _2*b*b, -_2*b*c],
-                [-_2*a*c,     -_2*b*c,     _1 - _2*c*c]
-            ],
-            [
-                [_1 - _2*a*a, -_2*a*b,     -_2*a*c],
-                [-_2*a*b,     _1 - _2*b*b, -_2*b*c],
-                [-_2*a*c,     -_2*b*c,     _1 - _2*c*c]
-            ]
-        ))
+        let t = [
+            [one - two*a*a, -two*a*b,      -two*a*c],
+            [-two*a*b,      one - two*b*b, -two*b*c],
+            [-two*a*c,      -two*b*c,      one - two*c*c]
+        ];
+
+        self.transform(t, t)
     }
 }
 
 impl<F, S, const D: usize> Shape<F, D> for Transform<F, S, D>
 where
     S: Shape<F, D>,
-    F: Float + AddAssign,
-    [(); D + 1]:,
-    [(); D + 1 - D]:
+    F: Float + Sum
 {
-    fn raytrace<const N: bool>(&self, ray: &Ray<F, D>) -> Raytrace<F, D, N>
-    where
-        [(); N as usize]:
+    fn raytrace(&self, ray: &Ray<F, D>) -> Raytrace<F, D>
     {
-        let ray = Ray::new_from_to(self.inv_transform_pos(ray.r), self.inv_transform_pos(ray.r.add_each(ray.v)));
-        let raytrace = self.s.raytrace(&ray);
-        Raytrace {
-            t: raytrace.t,
-            n: raytrace.n.map(|n| if let Some(n) = n
-            {
-                let n0 = ray.propagate(raytrace.t);
-                let n1 = n0.add_each(n);
+        let r_from = self.inv_transform_pos(ray.r);
+        let r_to = self.inv_transform_pos(ray.r_to());
+        let ray = Ray::new_from_to(r_from, r_to);
+        self.s.raytrace(&ray)
+    }
+
+    fn raytrace_with_norm(&self, ray: &Ray<F, D>) -> RaytraceWithNorm<F, D>
+    {
+        let r_from = self.inv_transform_pos(ray.r);
+        let r_to = self.inv_transform_pos(ray.r_to());
+        let ray = Ray::new_from_to(r_from, r_to);
+        let raytrace @ RaytraceWithNorm {raytrace: Raytrace {t}, n: _} = self.s.raytrace_with_norm(&ray);
+        raytrace.map_norm(|n| {
+                let mut n0 = ray.propagate(t);
+                let mut n1 = unsafe {
+                    n0.into_iter()
+                        .zip(n)
+                        .map(|(n0, n)| n0 + n)
+                        .next_chunk()
+                        .unwrap_unchecked()
+                };
+                n0 = self.transform_pos(n0);
+                n1 = self.transform_pos(n1);
     
-                Some(self.transform_pos(n1).sub_each(self.transform_pos(n0)))
-            }
-            else
-            {
-                None
+                unsafe {
+                    n1.into_iter()
+                        .zip(n0)
+                        .map(|(n1, n0)| n1 - n0)
+                        .next_chunk()
+                        .unwrap_unchecked()
+                }
             })
-        }
     }
 }

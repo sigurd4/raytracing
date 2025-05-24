@@ -1,5 +1,8 @@
 moddef::moddef!(
     flat(pub) mod {
-        plane
+        hypercube,
+        hyperplane,
+        hyperrectangle,
+        hypersphere
     }
 );

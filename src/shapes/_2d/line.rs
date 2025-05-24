@@ -1,3 +1,3 @@
-use crate::shapes::nd::Plane;
+use crate::shapes::nd::HyperPlane;
 
-pub type Line<F> = Plane<F, 1>;
+pub type Line<F> = HyperPlane<F, 2>;
