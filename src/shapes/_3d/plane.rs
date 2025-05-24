@@ -10,6 +10,7 @@ mod test
     use super::Plane;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Plane {

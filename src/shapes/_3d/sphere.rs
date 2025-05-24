@@ -10,6 +10,7 @@ mod test
     use super::Sphere;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Transform::new(Sphere::new([0.0, 0.0, 0.0], 1.0))

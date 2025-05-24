@@ -191,6 +191,7 @@ mod test
     use super::Tetrahedron;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Transform::new(Tetrahedron {

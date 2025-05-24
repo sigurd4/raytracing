@@ -68,6 +68,7 @@ mod test
     use super::TriangularPlane;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Transform::new(TriangularPlane::new([

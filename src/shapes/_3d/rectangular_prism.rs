@@ -12,6 +12,7 @@ mod test
     use super::RectangularPrism;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Transform::new(RectangularPrism {

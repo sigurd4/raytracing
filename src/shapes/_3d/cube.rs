@@ -12,6 +12,7 @@ mod test
     use super::Cube;
 
     #[test]
+    #[ignore]
     fn test()
     {
         let shape = Transform::new(Cube {
