@@ -115,7 +115,7 @@ mod tests {
             {
                 BACKGROUND
             }
-        }).save("image.png").unwrap();
+        }).save("output.png").unwrap();
     }
 
     #[test]
