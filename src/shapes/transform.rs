@@ -46,13 +46,17 @@ where
     }
 
     pub fn transform(mut self, t: [[F; D]; D], t_inv: [[F; D]; D]) -> Self
+    where
+        F: Sum
     {
-        self.t = matrix::mul_matrix_matrix(t, &self.t);
-        self.t_inv = matrix::mul_matrix_matrix(t_inv, &self.t_inv);
+        self.t = matrix::mul_matrix_matrix(&t, &self.t);
+        self.t_inv = matrix::mul_matrix_matrix(&t_inv, &self.t_inv);
         self
     }
 
     pub fn scale(self, scale: [F; D]) -> Self
+    where
+        F: Sum
     {
         self.transform(matrix::diagonal(scale), matrix::diagonal(scale.map(|scale| scale.recip())))
     }
@@ -64,6 +68,8 @@ where
     F: Float
 {
     pub fn rotate(self, theta: F) -> Self
+    where
+        F: Sum
     {
         let c = theta.cos();
         let s = theta.sin();
@@ -87,28 +93,32 @@ where
     F: Float
 {
     pub fn rotate(self, axis: [F; 3], theta: F) -> Self
+    where
+        F: Sum
     {
         let [x, y, z] = axis;
 
         let c = theta.cos();
         let s = theta.sin();
-        let c1m = F::one() - c;
+        let cc = F::one() - c;
 
         self.transform(
             [
-                [x*x*c1m + c,   y*x*c1m - z*s, z*x*c1m + y*s],
-                [x*y*c1m + z*s, y*y*c1m + c,   z*y*c1m - x*s],
-                [x*z*c1m - y*s, y*z*c1m + x*s, z*z*c1m + c  ],
+                [x*x*cc + c,   x*y*cc - z*s, x*z*cc + y*s],
+                [x*y*cc + z*s, y*y*cc + c,   y*z*cc - x*s],
+                [x*z*cc - y*s, y*z*cc + x*s, z*z*cc + c  ],
             ],
             [
-                [x*x*c1m + c,   y*x*c1m + z*s, z*x*c1m - y*s],
-                [x*y*c1m - z*s, y*y*c1m + c,   z*y*c1m + x*s],
-                [x*z*c1m + y*s, y*z*c1m - x*s, z*z*c1m + c  ],
+                [x*x*cc + c,   x*y*cc + z*s, x*z*cc - y*s],
+                [x*y*cc - z*s, y*y*cc + c,   y*z*cc + x*s],
+                [x*z*cc + y*s, y*z*cc - x*s, z*z*cc + c  ],
             ]
         )
     }
 
     pub fn mirror(self, n: [F; 3]) -> Self
+    where
+        F: Sum
     {
         let [a, b, c] = vec3::normalize(n);
 

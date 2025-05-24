@@ -76,7 +76,7 @@ where
                 ray.r.into_iter()
                     .zip(ray.v)
                     .zip(self.r0)
-                    .map(|((r, v), r0)| r - r0 + v*t)
+                    .map(|((r, v), r0)| r + v*t - r0)
                     .next_chunk()
                     .unwrap_unchecked()
             };

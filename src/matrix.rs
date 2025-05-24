@@ -74,17 +74,17 @@ where
     )
 }
 
-pub fn mul_matrix_matrix<F, const M: usize, const N: usize, const P: usize>(lhs: [[F; N]; M], rhs: &[[F; P]; N]) -> [[F; P]; M]
+pub fn mul_matrix_matrix<F, const M: usize, const N: usize, const P: usize>(lhs: &[[F; N]; M], rhs: &[[F; P]; N]) -> [[F; P]; M]
 where
-    F: Float
+    F: Float + Sum
 {
     unsafe {
-        lhs.into_iter()
-            .enumerate()
-            .map(|(i, lhs)| lhs.into_iter()
-                .zip(rhs.iter())
-                .map(|(lhs, rhs)| lhs*rhs[i])
-                .next_chunk()
+        lhs.iter()
+            .map(|lhs| (0..P).map(|i| lhs.iter()
+                    .zip(rhs)
+                    .map(|(&lhs, rhs)| lhs*rhs[i])
+                    .sum::<F>()
+                ).next_chunk()
                 .unwrap_unchecked()
             ).next_chunk()
             .unwrap_unchecked()
