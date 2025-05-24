@@ -1,14 +1,10 @@
 #![cfg_attr(not(test), no_std)]
-#![feature(generic_arg_infer)]
 #![feature(more_float_constants)]
 #![feature(let_chains)]
 #![feature(const_trait_impl)]
 #![feature(iter_next_chunk)]
-#![feature(adt_const_params)]
-#![feature(const_ops)]
 #![feature(slice_as_array)]
 #![feature(specialization)]
-#![feature(generic_const_exprs)]
 
 moddef::moddef!(
     pub mod {

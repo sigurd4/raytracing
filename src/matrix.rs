@@ -1,43 +1,48 @@
 use core::iter::Sum;
 
-use num::{traits::{ConstOne, ConstZero}, Float};
+use num::Float;
 
-#[const_trait]
-trait IdentitySpec: Float
+mod private
 {
-    fn _identity<const N: usize>() -> [[Self; N]; N];
-}
-impl<F> IdentitySpec for F
-where
-    F: Float
-{
-    default fn _identity<const N: usize>() -> [[Self; N]; N]
+    use num::{traits::{ConstOne, ConstZero}, Float};
+
+    #[const_trait]
+    pub trait IdentitySpec: Float
     {
-        let mut matrix = [[F::zero(); N]; N];
-        let one = F::one();
-        for dst in matrix.as_flattened_mut()
-            .iter_mut()
-            .step_by(N + 1)
-        {
-            *dst = one
-        }
-        matrix
+        fn _identity<const N: usize>() -> [[Self; N]; N];
     }
-}
-impl<F> const IdentitySpec for F
-where
-    F: Float + ConstOne + ConstZero
-{
-    fn _identity<const N: usize>() -> [[Self; N]; N]
+    impl<F> IdentitySpec for F
+    where
+        F: Float
     {
-        let mut matrix = [[F::ZERO; N]; N];
-        let mut i = 0;
-        while i < N
+        default fn _identity<const N: usize>() -> [[Self; N]; N]
         {
-            matrix[i][i] = F::ONE;
-            i += 1
+            let mut matrix = [[F::zero(); N]; N];
+            let one = F::one();
+            for dst in matrix.as_flattened_mut()
+                .iter_mut()
+                .step_by(N + 1)
+            {
+                *dst = one
+            }
+            matrix
         }
-        matrix
+    }
+    impl<F> const IdentitySpec for F
+    where
+        F: Float + ConstOne + ConstZero
+    {
+        fn _identity<const N: usize>() -> [[Self; N]; N]
+        {
+            let mut matrix = [[F::ZERO; N]; N];
+            let mut i = 0;
+            while i < N
+            {
+                matrix[i][i] = F::ONE;
+                i += 1
+            }
+            matrix
+        }
     }
 }
 
@@ -58,9 +63,9 @@ where
 
 pub const fn identity<F, const N: usize>() -> [[F; N]; N]
 where
-    F: Float + ~const IdentitySpec
+    F: Float + ~const private::IdentitySpec
 {
-    IdentitySpec::_identity()
+    F::_identity()
 }
 
 pub fn mul_matrix_collumn<F, const M: usize, const N: usize>(lhs: [[F; N]; M], rhs: [F; N]) -> [F; M]

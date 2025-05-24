@@ -1,6 +1,6 @@
-use core::{iter::Sum, ops::{AddAssign, DivAssign, SubAssign}};
+use core::iter::Sum;
 
-use num::{Float, Signed};
+use num::Float;
 
 use crate::{matrix, vec3, Ray, Raytrace, RaytraceWithNorm};
 
