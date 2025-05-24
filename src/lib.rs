@@ -5,7 +5,6 @@
 #![feature(iter_next_chunk)]
 #![feature(slice_as_array)]
 #![feature(specialization)]
-
 #![allow(clippy::excessive_precision)]
 
 moddef::moddef!(
