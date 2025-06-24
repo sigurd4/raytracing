@@ -9,7 +9,7 @@ repository = "https://github.com/sigurd4/raytracing"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-moddef = "0.2.2"
+moddef = "0.3.0"
 num = "0.4.1"
 
 [dev-dependencies]
